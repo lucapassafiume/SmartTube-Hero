@@ -36,6 +36,9 @@ import com.liskovsoft.smartyoutubetv2.common.app.presenters.dialogs.menu.provide
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.interfaces.SectionPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.interfaces.VideoGroupPresenter;
 import com.liskovsoft.smartyoutubetv2.common.app.views.BrowseView;
+import com.liskovsoft.smartyoutubetv2.common.discover.DiscoverEngine;
+import com.liskovsoft.smartyoutubetv2.common.discover.ZappingManager;
+import com.liskovsoft.sharedutils.helpers.MessageHelpers;
 import com.liskovsoft.smartyoutubetv2.common.misc.AppDataSourceManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.BrowseProcessorManager;
 import com.liskovsoft.smartyoutubetv2.common.misc.MediaServiceManager;
@@ -187,6 +190,7 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
         int uploadsType = getMainUIData().isUploadsOldLookEnabled() ? BrowseSection.TYPE_GRID : BrowseSection.TYPE_MULTI_GRID;
 
         mSectionsMapping.put(MediaGroup.TYPE_HOME, new BrowseSection(MediaGroup.TYPE_HOME, getContext().getString(R.string.header_home), BrowseSection.TYPE_ROW, R.drawable.icon_home, false));
+        mSectionsMapping.put(DiscoverEngine.SECTION_ID, new BrowseSection(DiscoverEngine.SECTION_ID, getContext().getString(R.string.header_discover), BrowseSection.TYPE_ROW, R.drawable.icon_discover, false));
         mSectionsMapping.put(MediaGroup.TYPE_SHORTS, new BrowseSection(MediaGroup.TYPE_SHORTS, getContext().getString(R.string.header_shorts), BrowseSection.TYPE_SHORTS_GRID, R.drawable.icon_shorts));
         mSectionsMapping.put(MediaGroup.TYPE_TRENDING, new BrowseSection(MediaGroup.TYPE_TRENDING, getContext().getString(R.string.header_trending), BrowseSection.TYPE_ROW, R.drawable.icon_trending));
         mSectionsMapping.put(MediaGroup.TYPE_KIDS_HOME, new BrowseSection(MediaGroup.TYPE_KIDS_HOME, getContext().getString(R.string.header_kids_home), BrowseSection.TYPE_ROW, R.drawable.icon_kids_home));
@@ -435,6 +439,10 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
             return;
         }
 
+        if (handleDiscoverClick(item)) {
+            return;
+        }
+
         // Check that channels new look enabled and we're on the first columnAdd commentMore actions
         if (belongsToChannelUploadsMultiGrid(item)) {
             if (getMainUIData().isUploadsAutoLoadEnabled()) {
@@ -645,6 +653,12 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
     }
 
     private void updateSection(BrowseSection section) {
+        if (section.getId() == DiscoverEngine.SECTION_ID) {
+            updateDiscoverRows(section);
+            updateRefreshTime();
+            return;
+        }
+
         switch (section.getType()) {
             case BrowseSection.TYPE_GRID:
             case BrowseSection.TYPE_SHORTS_GRID:
@@ -674,6 +688,110 @@ public class BrowsePresenter extends BasePresenter<BrowseView> implements Sectio
         }
 
         updateRefreshTime();
+    }
+
+    // ---------------- Scopri (Discover) section ----------------
+
+    private void updateDiscoverRows(BrowseSection section) {
+        disposeActions();
+
+        if (getView() == null) {
+            return;
+        }
+
+        getView().showProgressBar(true);
+
+        VideoGroup firstGroup = VideoGroup.from(section);
+        firstGroup.setAction(VideoGroup.ACTION_REPLACE);
+        getView().updateSection(firstGroup);
+
+        ZappingManager.instance().clearCategories();
+
+        AtomicInteger groupIndex = new AtomicInteger(-1);
+
+        VideoGroup actionsGroup = VideoGroup.from(createDiscoverActions(), section, groupIndex.incrementAndGet());
+        actionsGroup.setTitle(getContext().getString(R.string.discover_actions));
+        actionsGroup.setId("discover_actions".hashCode());
+        getView().updateSection(actionsGroup);
+
+        AtomicInteger rowCount = new AtomicInteger();
+
+        Disposable updateAction = new DiscoverEngine(getContext()).getRowsObserve()
+                .subscribe(
+                        row -> {
+                            if (getView() == null) {
+                                return;
+                            }
+                            getView().showProgressBar(false);
+                            rowCount.incrementAndGet();
+
+                            VideoGroup videoGroup = VideoGroup.from(row.videos, section, groupIndex.incrementAndGet());
+                            videoGroup.setTitle(row.title);
+                            videoGroup.setId(("discover_" + row.title).hashCode());
+
+                            ZappingManager.instance().addCategory(row.title, row.videos);
+                            getView().updateSection(videoGroup);
+                        },
+                        error -> {
+                            Log.e(TAG, "Discover error: %s", error.getMessage());
+                            if (getView() != null) {
+                                getView().showProgressBar(false);
+                            }
+                        },
+                        () -> {
+                            if (getView() != null) {
+                                getView().showProgressBar(false);
+                            }
+                            if (rowCount.get() == 0 && getContext() != null) {
+                                MessageHelpers.showMessage(getContext(), R.string.discover_empty);
+                            }
+                        });
+
+        mActions.add(updateAction);
+    }
+
+    private List<Video> createDiscoverActions() {
+        List<Video> actions = new ArrayList<>();
+        actions.add(createDiscoverAction(DiscoverEngine.ACTION_ZAPPING, R.string.discover_zapping, R.string.discover_zapping_desc, R.drawable.discover_zapping));
+        actions.add(createDiscoverAction(DiscoverEngine.ACTION_SHUFFLE, R.string.discover_shuffle, R.string.discover_shuffle_desc, R.drawable.discover_shuffle));
+        return actions;
+    }
+
+    private Video createDiscoverAction(String id, int titleResId, int descResId, int imageResId) {
+        Video action = new Video();
+        action.videoId = id;
+        action.title = getContext().getString(titleResId);
+        action.secondTitle = getContext().getString(descResId);
+        String imageUrl = "android.resource://" + getContext().getPackageName() + "/" + imageResId;
+        action.cardImageUrl = imageUrl;
+        action.bgImageUrl = imageUrl;
+        return action;
+    }
+
+    private boolean handleDiscoverClick(Video item) {
+        if (item == null) {
+            return false;
+        }
+
+        if (DiscoverEngine.ACTION_SHUFFLE.equals(item.videoId)) {
+            MessageHelpers.showMessage(getContext(), R.string.discover_shuffling);
+            refresh(false);
+            return true;
+        }
+
+        if (DiscoverEngine.ACTION_ZAPPING.equals(item.videoId)) {
+            if (ZappingManager.instance().getCategoryCount() == 0) {
+                MessageHelpers.showMessage(getContext(), R.string.discover_wait);
+            } else {
+                ZappingManager.instance().start(getContext(), 0, 0);
+            }
+            return true;
+        }
+
+        boolean isDiscoverItem = item.getGroup() != null && item.getGroup().getSection() != null &&
+                item.getGroup().getSection().getId() == DiscoverEngine.SECTION_ID;
+
+        return isDiscoverItem && ZappingManager.instance().startFrom(getContext(), item);
     }
 
     private void updateSettingsGrid(BrowseSection section, Callable<List<SettingsItem>> items) {

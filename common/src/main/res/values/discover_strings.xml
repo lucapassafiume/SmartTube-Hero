@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="header_discover" translatable="false">Scopri</string>
+    <string name="discover_actions" translatable="false">Scopri</string>
+    <string name="discover_zapping" translatable="false">Zapping Plus</string>
+    <string name="discover_zapping_desc" translatable="false">◀▶ categoria · ▲▼ video</string>
+    <string name="discover_shuffle" translatable="false">Rimescola</string>
+    <string name="discover_shuffle_desc" translatable="false">Nuove proposte, mai viste</string>
+    <string name="discover_shuffling" translatable="false">Rimescolo… cerco video nuovi per te</string>
+    <string name="discover_wait" translatable="false">Attendi qualche secondo, sto preparando le categorie</string>
+    <string name="discover_empty" translatable="false">Nessun video trovato. Accedi con il tuo account per i consigli basati sui tuoi gusti.</string>
+    <string name="zapping_hint" translatable="false">▲▼ video   ◀▶ categoria   OK guarda / comandi</string>
+</resources>

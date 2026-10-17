@@ -35,6 +35,7 @@ public class PlaybackActivity extends LeanbackActivity {
     private static final float GAMEPAD_TRIGGER_INTENSITY_OFF = 0.45f;
     private boolean gamepadTriggerPressed = false;
     private PlaybackFragment mPlaybackFragment;
+    private ZappingOverlay mZappingOverlay;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -44,6 +45,15 @@ public class PlaybackActivity extends LeanbackActivity {
                 getSupportFragmentManager().findFragmentByTag(getString(R.string.playback_tag));
         if (fragment instanceof PlaybackFragment) {
             mPlaybackFragment = (PlaybackFragment) fragment;
+        }
+        mZappingOverlay = new ZappingOverlay(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mZappingOverlay != null) {
+            mZappingOverlay.onResume();
         }
     }
 
@@ -57,6 +67,12 @@ public class PlaybackActivity extends LeanbackActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
+        // Zapping Plus: arrows change video/category while the player controls are hidden
+        if (mZappingOverlay != null && mPlaybackFragment != null &&
+                mZappingOverlay.dispatchKeyEvent(event, () -> mPlaybackFragment.isOverlayShown())) {
+            return true;
+        }
+
         if (mPlaybackFragment != null) {
             mPlaybackFragment.onDispatchKeyEvent(event);
         }
@@ -201,6 +217,9 @@ public class PlaybackActivity extends LeanbackActivity {
 
     @Override
     protected void onPause() {
+        if (mZappingOverlay != null) {
+            mZappingOverlay.onPause();
+        }
         boolean hasDialogBug = AppDialogPresenter.instance(this).isDialogShown() && Build.VERSION.SDK_INT <= 23;
         boolean isScreenOff = getPlayerData().getBackgroundMode() != PlayerData.BACKGROUND_MODE_DEFAULT && Utils.isHardScreenOff(this);
 

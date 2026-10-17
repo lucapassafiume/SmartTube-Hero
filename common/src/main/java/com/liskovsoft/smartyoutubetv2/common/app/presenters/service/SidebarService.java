@@ -238,6 +238,7 @@ public class SidebarService implements ProfileChangeListener {
     private void initSections() {
         mDefaultSections.put(R.string.header_notifications, MediaGroup.TYPE_NOTIFICATIONS);
         mDefaultSections.put(R.string.header_home, MediaGroup.TYPE_HOME);
+        mDefaultSections.put(R.string.header_discover, com.liskovsoft.smartyoutubetv2.common.discover.DiscoverEngine.SECTION_ID);
         mDefaultSections.put(R.string.header_shorts, MediaGroup.TYPE_SHORTS);
         mDefaultSections.put(R.string.header_trending, MediaGroup.TYPE_TRENDING);
         mDefaultSections.put(R.string.header_kids_home, MediaGroup.TYPE_KIDS_HOME);
@@ -304,6 +305,12 @@ public class SidebarService implements ProfileChangeListener {
 
         // Backward compatibility
         enableSection(MediaGroup.TYPE_SETTINGS, true);
+
+        // Scopri: add it once, then respect the user's choice
+        if (!mPrefs.isDiscoverSectionInitialized()) {
+            mPrefs.setDiscoverSectionInitialized(true);
+            enableSection(com.liskovsoft.smartyoutubetv2.common.discover.DiscoverEngine.SECTION_ID, true);
+        }
 
         cleanupPinnedItems();
     }

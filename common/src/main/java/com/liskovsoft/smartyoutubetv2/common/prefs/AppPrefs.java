@@ -99,6 +99,14 @@ public class AppPrefs extends SharedPreferencesBase implements AccountChangeList
         setData(getProfileKey(CHANNEL_GROUP_DATA,  true), data);
     }
 
+    public boolean isDiscoverSectionInitialized() {
+        return getBoolean(getProfileKey("discover_section_initialized", true), false);
+    }
+
+    public void setDiscoverSectionInitialized(boolean initialized) {
+        putBoolean(getProfileKey("discover_section_initialized", true), initialized);
+    }
+
     public String getSidebarData() {
         // Always use multiple profiles
         return getData(getProfileKey(SIDEBAR_DATA,  true));
